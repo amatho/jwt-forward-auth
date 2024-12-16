@@ -14,7 +14,7 @@ import (
 
 var oauth2Config oauth2.Config
 var jwksKeyfunc keyfunc.Keyfunc
-var callbackURL string
+var cookieName string = "accessToken"
 
 func main() {
 	err := godotenv.Load()

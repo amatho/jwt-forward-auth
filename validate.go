@@ -1,27 +1,32 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"strings"
 )
 
 func handleValidate(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	tokenString, found := strings.CutPrefix(authHeader, "Bearer ")
-	if !found {
-		log.Printf("No auth token (value: %q)", authHeader)
-		state := "state"
-		url := oauth2Config.AuthCodeURL(state)
+	accessTokenCookie, err := r.Cookie(cookieName)
+	if err != nil {
+		redirectUri := r.Header.Get("X-Forwarded-Uri")
+		if len(redirectUri) == 0 {
+			http.Error(w, "Missing 'X-Forwarded-Uri' header", http.StatusBadRequest)
+			return
+		}
+
+		url := oauth2Config.AuthCodeURL(redirectUri)
 		http.Redirect(w, r, url, http.StatusFound)
 		return
 	}
 
-	_, err := verifyToken(tokenString)
+	tokenString := accessTokenCookie.Value
+	_, err = verifyToken(tokenString)
 	if err != nil {
-		log.Printf("Could not verify token (error: %v)", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("Could not validate token (error: %v)", err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	fmt.Fprintln(w, "Successfully authenticated")
 }

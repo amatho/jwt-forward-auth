@@ -10,8 +10,6 @@ import (
 func handleValidate(w http.ResponseWriter, r *http.Request) {
 	accessTokenCookie, err := r.Cookie(cookieName)
 	if err != nil {
-		log.Printf("Could not get access token (err: %v)", err)
-
 		scheme := r.Header.Get("X-Forwarded-Proto")
 		if len(scheme) == 0 {
 			http.Error(w, "Missing 'X-Forwarded-Proto' header", http.StatusBadRequest)

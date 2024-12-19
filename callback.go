@@ -45,6 +45,9 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	}
+	if len(cookieDomain) != 0 {
+		cookie.Domain = cookieDomain
+	}
 	http.SetCookie(w, &cookie)
 
 	url := state

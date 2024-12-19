@@ -14,6 +14,7 @@ import (
 
 var oauth2Config oauth2.Config
 var jwksKeyfunc keyfunc.Keyfunc
+var cookieDomain string
 var cookieName string = "accessToken"
 
 func main() {
@@ -26,6 +27,7 @@ func main() {
 	clientSecret := requireEnv("CLIENT_SECRET")
 	redirectURL := requireEnv("REDIRECT_URL")
 	issuerURL := requireEnv("ISSUER_URL")
+	cookieDomain = os.Getenv("COOKIE_DOMAIN")
 
 	provider, err := oidc.NewProvider(context.Background(), issuerURL)
 	if err != nil {

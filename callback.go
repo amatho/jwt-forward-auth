@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 )
@@ -49,5 +48,5 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &cookie)
 
 	url := state
-	fmt.Fprintf(w, "Successfully authenticated.\nRedirect would be to: %v", url)
+	http.Redirect(w, r, url, http.StatusFound)
 }

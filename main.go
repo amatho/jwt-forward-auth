@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/coreos/go-oidc"
@@ -12,10 +13,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var oauth2Config oauth2.Config
-var jwksKeyfunc keyfunc.Keyfunc
-var cookieDomain string
-var cookieName string = "accessToken"
+var (
+	oauth2Config             oauth2.Config
+	jwksKeyfunc              keyfunc.Keyfunc
+	cookieDomain             string
+	accessTokenCookieName    string = "accessToken"
+	refreshTokenCookieName   string = "refreshToken"
+	refreshTokenCookieMaxAge int
+)
 
 func main() {
 	err := godotenv.Load()
@@ -28,6 +33,12 @@ func main() {
 	redirectURL := requireEnv("REDIRECT_URL")
 	issuerURL := requireEnv("ISSUER_URL")
 	cookieDomain = os.Getenv("COOKIE_DOMAIN")
+	refreshTokenExpiresSeconds := requireEnv("REFRESH_TOKEN_EXPIRES_SECONDS")
+	refreshTokenCookieMaxAge, err = strconv.Atoi(refreshTokenExpiresSeconds)
+	if err != nil {
+		log.Fatalf("Could not parse refresh token expiration (in seconds) as an integer (value: %q)",
+			refreshTokenExpiresSeconds)
+	}
 
 	provider, err := oidc.NewProvider(context.Background(), issuerURL)
 	if err != nil {

@@ -18,37 +18,36 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	rawToken, err := oauth2Config.Exchange(context.Background(), code)
 	if err != nil {
-		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("Failed to exchange token (err: %v)", err)
+		unauthorized(w)
 		return
 	}
 
-	tokenString := rawToken.AccessToken
-	token, err := verifyToken(tokenString)
+	accessTokenString := rawToken.AccessToken
+	accessToken, err := verifyToken(accessTokenString)
 	if err != nil {
-		log.Printf("Could not verify token in callback (error: %v)", err)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		log.Printf("Could not verify token in callback (err: %v)", err)
+		unauthorized(w)
 		return
 	}
 
-	expDate, err := token.Claims.GetExpirationTime()
+	expDate, err := accessToken.Claims.GetExpirationTime()
 	if err != nil {
-		http.Error(w, "Failed to get token expiration date: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("Failed to get token expiration date (err: %v)", err)
+		unauthorized(w)
 		return
 	}
 
-	cookie := http.Cookie{
-		Name:     cookieName,
-		Value:    tokenString,
-		Path:     "/",
-		Expires:  expDate.Time,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	}
-	if len(cookieDomain) != 0 {
-		cookie.Domain = cookieDomain
-	}
+	cookie := tokenCookieWithExpires(accessTokenCookieName, accessTokenString, expDate.Time)
 	http.SetCookie(w, &cookie)
+
+	refreshTokenString := rawToken.RefreshToken
+	if len(refreshTokenString) > 0 {
+		cookie := tokenCookieWithMaxAge(refreshTokenCookieName, refreshTokenString, refreshTokenCookieMaxAge)
+		http.SetCookie(w, &cookie)
+	} else {
+		log.Printf("Refresh token was empty")
+	}
 
 	url := state
 	http.Redirect(w, r, url, http.StatusFound)

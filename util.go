@@ -12,6 +12,11 @@ func unauthorized(w http.ResponseWriter) {
 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
 }
 
+func redirectToAuth(w http.ResponseWriter, r *http.Request, appRedirectUrl string) {
+	url := oauth2Config.AuthCodeURL(appRedirectUrl)
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
 func verifyToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse(tokenString, jwksKeyfunc.Keyfunc)
 	if err != nil {
@@ -35,6 +40,20 @@ func tokenCookieWithMaxAge(name string, value string, maxAge int) http.Cookie {
 func tokenCookieWithExpires(name string, value string, expires time.Time) http.Cookie {
 	cookie := tokenCookie(name, value)
 	cookie.Expires = expires
+	return cookie
+}
+
+func clearAuthCookies(w http.ResponseWriter) {
+	accessCookie := deleteTokenCookie(accessTokenCookieName)
+	http.SetCookie(w, &accessCookie)
+	refreshCookie := deleteTokenCookie(refreshTokenCookieName)
+	http.SetCookie(w, &refreshCookie)
+}
+
+func deleteTokenCookie(name string) http.Cookie {
+	cookie := tokenCookie(name, "")
+	cookie.MaxAge = -1
+	cookie.Expires = time.Unix(0, 0)
 	return cookie
 }
 

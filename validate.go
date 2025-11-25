@@ -60,21 +60,24 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		newToken, err := tokenSrc.Token()
 		if err != nil {
 			log.Printf("Could not refresh token (err: %v)", err)
-			unauthorized(w)
+			clearAuthCookies(w)
+			redirectToAuth(w, r, appRedirectUrl)
 			return
 		}
 
 		accessToken, err := verifyToken(newToken.AccessToken)
 		if err != nil {
 			log.Printf("Refreshed token was unverified (err: %v)", err)
-			unauthorized(w)
+			clearAuthCookies(w)
+			redirectToAuth(w, r, appRedirectUrl)
 			return
 		}
 
 		expDate, err := accessToken.Claims.GetExpirationTime()
 		if err != nil {
 			log.Printf("Failed to get expiration date of refreshed token (err: %v)", err)
-			unauthorized(w)
+			clearAuthCookies(w)
+			redirectToAuth(w, r, appRedirectUrl)
 			return
 		}
 
@@ -90,6 +93,5 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := oauth2Config.AuthCodeURL(appRedirectUrl)
-	http.Redirect(w, r, url, http.StatusFound)
+	redirectToAuth(w, r, appRedirectUrl)
 }

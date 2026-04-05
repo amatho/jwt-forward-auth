@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 )
 
 var (
+	logger                   = slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	oauth2Config             oauth2.Config
 	jwksKeyfunc              keyfunc.Keyfunc
 	cookieDomain             string
@@ -25,7 +27,7 @@ var (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Printf("Could not load .env file (%s)", err)
+		logger.Debug(fmt.Sprintf("Could not load .env file (%s)", err))
 	}
 
 	clientID := requireEnv("CLIENT_ID")
@@ -36,16 +38,17 @@ func main() {
 	refreshTokenExpiresSeconds := requireEnv("REFRESH_TOKEN_EXPIRES_SECONDS")
 	refreshTokenCookieMaxAge, err = strconv.Atoi(refreshTokenExpiresSeconds)
 	if err != nil {
-		log.Fatalf("Could not parse refresh token expiration (in seconds) as an integer (value: %q)",
-			refreshTokenExpiresSeconds)
+		logger.Error(fmt.Sprintf("Could not parse refresh token expiration (in seconds) as an integer (value: %q)",
+			refreshTokenExpiresSeconds))
 	}
 
 	provider, err := oidc.NewProvider(context.Background(), issuerURL)
 	if err != nil {
-		log.Fatalf("Failed to create OIDC provider: %v", err)
+		logger.Error("Failed to create OIDC provider", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("Provider endpoint: %q", provider.Endpoint())
+	logger.Info(fmt.Sprintf("Provider endpoint: %q", provider.Endpoint()))
 	oauth2Config = oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -56,19 +59,23 @@ func main() {
 	jwksUrl := issuerURL + "/.well-known/jwks.json"
 	keyfunc, err := keyfunc.NewDefault([]string{jwksUrl})
 	if err != nil {
-		log.Fatalf("Failed to create keyfunc from %s.\nError: %s", jwksUrl, err)
+		logger.Error(fmt.Sprintf("Failed to create keyfunc from %s", jwksUrl), "error", err)
+		os.Exit(1)
 	}
 	jwksKeyfunc = keyfunc
 
-	http.HandleFunc("/", handleValidate)
+	http.HandleFunc("/check", handleValidate)
+	http.HandleFunc("/check/", handleValidate)
 	http.HandleFunc("/callback", handleCallback)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	logger.Info(http.ListenAndServe(":8080", nil).Error())
+	os.Exit(0)
 }
 
 func requireEnv(key string) string {
 	value := os.Getenv(key)
 	if len(value) == 0 {
-		log.Fatalf("Missing environment variable '%s'", key)
+		logger.Error(fmt.Sprintf("Missing environment variable '%s'", key))
+		os.Exit(1)
 	}
 	return value
 }

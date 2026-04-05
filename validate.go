@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -12,6 +11,8 @@ import (
 )
 
 func handleValidate(w http.ResponseWriter, r *http.Request) {
+	logRequest(r)
+
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err == nil {
 		accessTokenString := accessTokenCookie.Value
@@ -28,23 +29,13 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host := r.Header.Get("X-Forwarded-Host")
-	if len(host) == 0 {
-		http.Error(w, "Missing 'X-Forwarded-Host' header", http.StatusBadRequest)
-		return
-	}
-
-	redirectUri := r.Header.Get("X-Forwarded-Uri")
-	if len(redirectUri) == 0 {
-		http.Error(w, "Missing 'X-Forwarded-Uri' header", http.StatusBadRequest)
-		return
-	}
+	path := strings.TrimPrefix(r.RequestURI, "/check")
 
 	b := new(strings.Builder)
 	b.WriteString(scheme)
 	b.WriteString("://")
-	b.WriteString(host)
-	b.WriteString(redirectUri)
+	b.WriteString(r.Host)
+	b.WriteString(path)
 	appRedirectUrl := b.String()
 
 	refreshTokenCookie, err := r.Cookie(refreshTokenCookieName)
@@ -59,25 +50,22 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		})
 		newToken, err := tokenSrc.Token()
 		if err != nil {
-			log.Printf("Could not refresh token (err: %v)", err)
-			clearAuthCookies(w)
-			redirectToAuth(w, r, appRedirectUrl)
+			logger.Error("Could not refresh token", "error", err)
+			clearCookiesAndRedirectToAuth(w, r, appRedirectUrl)
 			return
 		}
 
 		accessToken, err := verifyToken(newToken.AccessToken)
 		if err != nil {
-			log.Printf("Refreshed token was unverified (err: %v)", err)
-			clearAuthCookies(w)
-			redirectToAuth(w, r, appRedirectUrl)
+			logger.Error("Refreshed token was unverified", "error", err)
+			clearCookiesAndRedirectToAuth(w, r, appRedirectUrl)
 			return
 		}
 
 		expDate, err := accessToken.Claims.GetExpirationTime()
 		if err != nil {
-			log.Printf("Failed to get expiration date of refreshed token (err: %v)", err)
-			clearAuthCookies(w)
-			redirectToAuth(w, r, appRedirectUrl)
+			logger.Error("Failed to get expiration date of refreshed token", "error", err)
+			clearCookiesAndRedirectToAuth(w, r, appRedirectUrl)
 			return
 		}
 
@@ -94,4 +82,11 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectToAuth(w, r, appRedirectUrl)
+}
+
+func logRequest(r *http.Request) {
+	sanitizedHeader := r.Header.Clone()
+	sanitizedHeader.Del("Cookie")
+	sanitizedHeader.Del("Authorization")
+	logger.Info("Validating request", "method", r.Method, "url", r.URL.String(), "headers", fmt.Sprint(sanitizedHeader))
 }

@@ -12,6 +12,14 @@ func unauthorized(w http.ResponseWriter) {
 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
 }
 
+func clearCookiesAndRedirectToAuth(w http.ResponseWriter, r *http.Request, appRedirectUrl string) {
+	accessCookie := deleteTokenCookie(accessTokenCookieName)
+	http.SetCookie(w, &accessCookie)
+	refreshCookie := deleteTokenCookie(refreshTokenCookieName)
+	http.SetCookie(w, &refreshCookie)
+	redirectToAuth(w, r, appRedirectUrl)
+}
+
 func redirectToAuth(w http.ResponseWriter, r *http.Request, appRedirectUrl string) {
 	url := oauth2Config.AuthCodeURL(appRedirectUrl)
 	http.Redirect(w, r, url, http.StatusFound)
@@ -41,13 +49,6 @@ func tokenCookieWithExpires(name string, value string, expires time.Time) http.C
 	cookie := tokenCookie(name, value)
 	cookie.Expires = expires
 	return cookie
-}
-
-func clearAuthCookies(w http.ResponseWriter) {
-	accessCookie := deleteTokenCookie(accessTokenCookieName)
-	http.SetCookie(w, &accessCookie)
-	refreshCookie := deleteTokenCookie(refreshTokenCookieName)
-	http.SetCookie(w, &refreshCookie)
 }
 
 func deleteTokenCookie(name string) http.Cookie {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 )
 
@@ -18,7 +17,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	rawToken, err := oauth2Config.Exchange(context.Background(), code)
 	if err != nil {
-		log.Printf("Failed to exchange token (err: %v)", err)
+		logger.Error("Failed to exchange token", "error", err)
 		unauthorized(w)
 		return
 	}
@@ -26,14 +25,14 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	accessTokenString := rawToken.AccessToken
 	accessToken, err := verifyToken(accessTokenString)
 	if err != nil {
-		log.Printf("Could not verify token in callback (err: %v)", err)
+		logger.Error("Could not verify token in callback", "error", err)
 		unauthorized(w)
 		return
 	}
 
 	expDate, err := accessToken.Claims.GetExpirationTime()
 	if err != nil {
-		log.Printf("Failed to get token expiration date (err: %v)", err)
+		logger.Error("Failed to get token expiration date", "error", err)
 		unauthorized(w)
 		return
 	}
@@ -46,7 +45,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		cookie := tokenCookieWithMaxAge(refreshTokenCookieName, refreshTokenString, refreshTokenCookieMaxAge)
 		http.SetCookie(w, &cookie)
 	} else {
-		log.Printf("Refresh token was empty")
+		logger.Warn("Refresh token was empty")
 	}
 
 	url := state
